@@ -159,9 +159,20 @@ pub fn derive_seed(
     out
 }
 
+/// Build a local, deterministic RNG from a 32-byte seed block.
+pub fn rng_from_seed_block(
+    seed_block: [u8; 32],
+) -> CtrngRng<MockCtrngClient<ChaCha20Rng>> {
+    // This is safe because CtrngRng::new only fails if next_block() fails,
+    // and MockCtrngClient::from_seed is deterministic and infallible.
+    CtrngRng::new(
+        MockCtrngClient::from_seed(seed_block)
+    ).expect("MockCtrngClient::from_seed cannot fail")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{CtrngError, CtrngRng, MockCtrngClient, RandomBlockSource, derive_seed};
+    use super::{CtrngError, CtrngRng, MockCtrngClient, RandomBlockSource, derive_seed, rng_from_seed_block};
     use rand_core::RngCore;
     use std::collections::HashSet;
 
@@ -250,5 +261,35 @@ mod tests {
                 "duplicate seed for counter {ctr}"
             );
         }
+    }
+
+    #[test]
+    fn rng_from_seed_block_is_deterministic_for_same_seed() {
+        let seed = [0x11; 32];
+
+        let mut rng1 = rng_from_seed_block(seed);
+        let mut rng2 = rng_from_seed_block(seed);
+
+        let mut buf1 = [0u8; 64];
+        let mut buf2 = [0u8; 64];
+
+        rng1.try_fill_bytes_fallible(&mut buf1).unwrap();
+        rng2.try_fill_bytes_fallible(&mut buf2).unwrap();
+
+        assert_eq!(buf1, buf2, "same seed should give identical output");
+    }
+
+    #[test]
+    fn rng_from_seed_block_differs_for_different_seeds() {
+        let mut rng_a = rng_from_seed_block([0x11; 32]);
+        let mut rng_b = rng_from_seed_block([0x22; 32]);
+
+        let mut buf_a = [0u8; 64];
+        let mut buf_b = [0u8; 64];
+
+        rng_a.try_fill_bytes_fallible(&mut buf_a).unwrap();
+        rng_b.try_fill_bytes_fallible(&mut buf_b).unwrap();
+
+        assert_ne!(buf_a, buf_b, "different seeds should give different output");
     }
 }
