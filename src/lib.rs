@@ -3,6 +3,20 @@ use rand_core::{impls, CryptoRng, Error, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
+#[derive(Debug, serde::Deserialize)]
+struct BeaconData {
+    sequence: u64,
+    timestamp: u64,
+    ctrng: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct BeaconResponse {
+    previous: String,
+    data: BeaconData,
+}
+
+
 /// Errors that can occur while interacting with a cosmic TRNG backend.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CtrngError {
@@ -18,7 +32,7 @@ impl CtrngError {
 
 impl From<CtrngError> for rand_core::Error {
     fn from(err: CtrngError) -> Self {
-        rand_core::Error::new(err)
+        rand_core::Error::new(err.to_string())
     }
 }
 
@@ -109,6 +123,107 @@ impl<C> Drop for CtrngRng<C> {
     fn drop(&mut self) {
         self.buffer.zeroize();
         self.cursor.zeroize();
+    }
+}
+
+/// Randomness backend that pulls 32-byte blocks from an IPFS beacon
+#[derive(Debug)]
+pub struct IpfsCtrngClient {
+    gateway_base: String,
+    beacon_key: String,
+
+    // cache of decoded 32-byte values from the last fetch
+    cache: Vec<[u8; 32]>,
+    cursor: usize,
+}
+
+impl IpfsCtrngClient {
+    /// Build a new IPFS-backed client.
+    ///
+    /// gateway_base: base URL of the IPFS gateway (ex: "https://ipfs.io")
+    /// beacon_key: IPNS key for the beacon (ex: "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe").
+    pub fn new(gateway_base: impl Into<String>, beacon_key: impl Into<String>) -> Self {
+        Self {
+            gateway_base: gateway_base.into(),
+            beacon_key: beacon_key.into(),
+            cache: Vec::new(),
+            cursor: 0,
+        }
+    }
+
+    /// Make a blocking HTTP GET to the beacon "latest" endpoint and
+    /// refresh our cache with the newly advertised ctrng entries.
+    fn refill_cache(&mut self) -> Result<(), CtrngError> {
+        let url = format!(
+            "{}/ipns/{}",
+            self.gateway_base.trim_end_matches('/'),
+            self.beacon_key
+        );
+
+        let resp = reqwest::blocking::get(&url)
+            .map_err(|e| CtrngError::backend(format!("ipfs fetch failed: {e}")))?;
+
+        if !resp.status().is_success() {
+            return Err(CtrngError::backend(format!(
+                "ipfs returned HTTP {}",
+                resp.status()
+            )));
+        }
+
+        let bytes = resp
+            .bytes()
+            .map_err(|e| CtrngError::backend(format!("ipfs body read failed: {e}")))?;
+
+        let parsed: BeaconResponse = serde_json::from_slice(&bytes)
+            .map_err(|e| CtrngError::backend(format!("ipfs json parse failed: {e}")))?;
+
+        // Decode the ctrng hex strings into [u8; 32]
+        let mut new_cache = Vec::with_capacity(parsed.data.ctrng.len());
+        for hex_str in parsed.data.ctrng.iter() {
+            let raw = hex::decode(hex_str)
+                .map_err(|e| CtrngError::backend(format!("invalid hex in ctrng entry: {e}")))?;
+
+            if raw.len() != 32 {
+                return Err(CtrngError::backend(format!(
+                    "ctrng entry length is {}, expected 32 bytes",
+                    raw.len()
+                )));
+            }
+
+            let mut block = [0u8; 32];
+            block.copy_from_slice(&raw);
+            new_cache.push(block);
+        }
+
+        // If we didn't get anything usable, this is an error
+        if new_cache.is_empty() {
+            return Err(CtrngError::backend("ipfs beacon returned empty ctrng list"));
+        }
+
+        // Install new cache
+        self.cache = new_cache;
+        self.cursor = 0;
+
+        Ok(())
+    }
+}
+
+impl RandomBlockSource for IpfsCtrngClient {
+    fn next_block(&mut self) -> Result<[u8; 32], CtrngError> {
+        // If we still have unused cached blocks, serve the next one
+        if self.cursor < self.cache.len() {
+            let block = self.cache[self.cursor];
+            self.cursor += 1;
+            return Ok(block);
+        }
+
+        // Otherwise, fetch latest from IPFS and refill cache
+        self.refill_cache()?;
+
+        // After refill, we must have at least one entry
+        let block = self.cache[self.cursor];
+        self.cursor += 1;
+        Ok(block)
     }
 }
 
@@ -292,4 +407,19 @@ mod tests {
 
         assert_ne!(buf_a, buf_b, "different seeds should give different output");
     }
+
+    #[test]
+    #[ignore] //todo : add an offline test for the ipfs client
+    fn ipfs_client_can_fetch_live_block() {
+        let gateway = "https://ipfs.io";
+        let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+
+        let mut client = super::IpfsCtrngClient::new(gateway, beacon_key);
+
+        let block = client.next_block()
+            .expect("should fetch a 32-byte block from the beacon");
+
+        assert_eq!(block.len(), 32, "block must be exactly 32 bytes");
+    }
+
 }
