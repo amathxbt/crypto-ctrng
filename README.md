@@ -1,5 +1,3 @@
-# seedselection
-
 **WARNING: This project is experimental and work-in-progress, use at your own risk!**
 
 ## Overview
