@@ -29,6 +29,17 @@ let mut ctrng = crypto_ctrng::IpfsCtrngClient::new(gateway, beacon_key);
 let seed = ctrng.next_block().expect("failed to fetch IPFS block")
 ```
 
+## Tests
+
+To run offline tests : 
+
+```cargo tests```
+
+To run offline and online tests : 
+
+```cargo test -- --include ignored```
+
+
 ## License
 
 This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
