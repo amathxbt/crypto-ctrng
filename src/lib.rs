@@ -10,6 +10,6 @@ pub use traits::RandomBlockSource;
 pub use rng::CtrngRng;
 pub use derive::{derive_seed, rng_from_seed_block};
 pub use ctrng::mock::MockCtrngClient;
-
-#[cfg(feature = "ipfs")]
+pub use ctrng::local::LocalCtrngClient;
+pub use ctrng::mixed::MixedCtrngClient;
 pub use ctrng::ipfs::IpfsCtrngClient;

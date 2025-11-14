@@ -1,3 +1,4 @@
 pub mod mock;
-#[cfg(feature = "ipfs")]
+pub mod local;
+pub mod mixed;
 pub mod ipfs;
