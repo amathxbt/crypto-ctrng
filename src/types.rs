@@ -10,3 +10,10 @@ pub struct BeaconResponse {
     pub previous: String,
     pub data: BeaconData,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct CtrngBlock {
+    pub sequence: u64,
+    pub timestamp: u64,
+    pub data: [u8; 32],
+}

@@ -1,4 +1,4 @@
-pub mod mock;
+pub mod ipfs;
 pub mod local;
 pub mod mixed;
-pub mod ipfs;
+pub mod mock;

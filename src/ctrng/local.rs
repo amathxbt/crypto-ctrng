@@ -19,4 +19,3 @@ impl RandomBlockSource for LocalCtrngClient {
         Ok(block)
     }
 }
-

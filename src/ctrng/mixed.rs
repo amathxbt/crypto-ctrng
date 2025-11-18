@@ -1,7 +1,7 @@
+use crate::ctrng::ipfs::IpfsCtrngClient;
+use crate::ctrng::local::LocalCtrngClient;
 use crate::error::CtrngError;
 use crate::traits::RandomBlockSource;
-use crate::ctrng::local::LocalCtrngClient;
-use crate::ctrng::ipfs::IpfsCtrngClient;
 
 #[derive(Debug)]
 pub struct MixedCtrngClient {
@@ -27,7 +27,7 @@ impl RandomBlockSource for MixedCtrngClient {
     fn next_block(&mut self) -> Result<[u8; 32], CtrngError> {
         let ipfs_block = self.ipfs_client.next_block()?;
         let local_block = self.local_client.next_block()?;
-        
+
         let mut mixed_block = [0u8; 32];
         for i in 0..32 {
             mixed_block[i] = ipfs_block[i] ^ local_block[i];
@@ -35,5 +35,3 @@ impl RandomBlockSource for MixedCtrngClient {
         Ok(mixed_block)
     }
 }
-
-

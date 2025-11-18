@@ -7,6 +7,21 @@ It allows deterministic or hardware-backed randomness to be consumed through the
 
 The main goals is to expose a clean, composable API for hardware or remote entropy backends. It can serve as the randomness foundation for distributed protocols such as threshold ECDSA, or MPC systems that require reproducible yet secure entropy sources.
 
+### Entropy ownership contract
+
+This crate's responsibility is to **verify** that the cTRNG backend provides unique blocks. The randomness flow is split between three layers:
+
+- **Gateway/back-end** (e.g. IPFS beacon, hardware TRNG) is responsible for generating unique 32-byte blocks with monotonic timestamps. This responsibility sits outside of this crate.
+- **This crate** (`crypto-ctrng`) verifies uniqueness by enforcing timestamp monotonicity and rejecting duplicate blocks.
+- **Application/client code** (e.g. TECDSA library) is responsible for personalizing the provided blocks using `derive_seed(execution_id, party_id, counter, block)` to domain-separate pulls so a single user never receives the same derived value twice, even if they consume the same cTRNG block as other users (but this is something that we are looking to prevent in the future).
+
+**Note on entropy mixing:**
+- `MixedCtrngClient` combines entropy sources (XOR of IPFS beacon + local OS randomness) for enhanced security, but still relies on the gateway for uniqueness guarantees.
+
+**Uniqueness guarantees:**
+- This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse (I thought so, but according to today's bug, we can have same ctrng for two different timestamp, so we need to find another way).
+- The calling library must use `derive_seed()` to personalize blocks per user/execution to prevent collisions between different users reading the same raw block.
+
 ## Usage
 
 To use this crate, add it to your `Cargo.toml`:
