@@ -31,10 +31,10 @@ fn mixed_is_32_bytes() {
 fn each_source_is_different() {
     let mut ipfs = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
     let mut mixed = crypto_ctrng::MixedCtrngClient::new(GATEWAY, BEACON_KEY).unwrap();
-    
+
     let ipfs_block = ipfs.next_block().unwrap();
     let mixed_block = mixed.next_block().unwrap();
-    
+
     assert_ne!(ipfs_block, mixed_block);
 }
 
@@ -46,4 +46,3 @@ fn mixed_unique_blocks() {
     let b = client.next_block().unwrap();
     assert_ne!(a, b);
 }
-

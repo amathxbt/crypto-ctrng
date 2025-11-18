@@ -5,13 +5,13 @@ pub enum CtrngError {
 }
 
 impl CtrngError {
-    pub fn backend(msg: impl Into<String>) -> Self { 
-        Self::Backend(msg.into()) 
+    pub fn backend(msg: impl Into<String>) -> Self {
+        Self::Backend(msg.into())
     }
 }
 
 impl From<CtrngError> for rand_core::Error {
-    fn from(err: CtrngError) -> Self { 
-        rand_core::Error::new(err.to_string()) 
+    fn from(err: CtrngError) -> Self {
+        rand_core::Error::new(err.to_string())
     }
 }
