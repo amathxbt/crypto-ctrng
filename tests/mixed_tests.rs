@@ -21,7 +21,8 @@ fn local_unique_blocks() {
 #[test]
 #[ignore]
 fn mixed_is_32_bytes() {
-    let mut client = crypto_ctrng::MixedCtrngClient::new(GATEWAY, BEACON_KEY).unwrap();
+    let ipfs = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
+    let mut client = crypto_ctrng::MixedCtrngClient::new(ipfs).unwrap();
     let block = client.next_block().unwrap();
     assert_eq!(block.len(), 32);
 }
@@ -30,7 +31,8 @@ fn mixed_is_32_bytes() {
 #[ignore]
 fn each_source_is_different() {
     let mut ipfs = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
-    let mut mixed = crypto_ctrng::MixedCtrngClient::new(GATEWAY, BEACON_KEY).unwrap();
+    let ipfs2 = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
+    let mut mixed = crypto_ctrng::MixedCtrngClient::new(ipfs2).unwrap();
 
     let ipfs_block = ipfs.next_block().unwrap();
     let mixed_block = mixed.next_block().unwrap();
@@ -41,7 +43,8 @@ fn each_source_is_different() {
 #[test]
 #[ignore]
 fn mixed_unique_blocks() {
-    let mut client = crypto_ctrng::MixedCtrngClient::new(GATEWAY, BEACON_KEY).unwrap();
+    let ipfs = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
+    let mut client = crypto_ctrng::MixedCtrngClient::new(ipfs).unwrap();
     let a = client.next_block().unwrap();
     let b = client.next_block().unwrap();
     assert_ne!(a, b);
