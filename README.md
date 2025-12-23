@@ -22,6 +22,15 @@ This crate's responsibility is to **verify** that the cTRNG backend provides uni
 - This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse (I thought so, but according to today's bug, we can have same ctrng for two different timestamp, so we need to find another way).
 - The calling library must use `derive_seed()` to personalize blocks per user/execution to prevent collisions between different users reading the same raw block.
 
+## Usage modes
+
+| Mode | Code | DRBG | Reseed |
+|------|------|------|--------|
+| Raw entropy | `CtrngRng::new(source)` | ❌ | N/A |
+| DRBG one-shot | `rng_from_seed_block(block)` | ChaCha20 | ❌ |
+| DRBG + auto reseed | `ReseedingRng::new(source)` | ChaCha20 | 3200 bytes / 1 week |
+| DRBG + prediction resistance | `ReseedingRng::with_prediction_resistance(source)` | ChaCha20 | every call |
+
 ## Usage
 
 To use this crate, add it to your `Cargo.toml`:
@@ -31,28 +40,60 @@ To use this crate, add it to your `Cargo.toml`:
 crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git", tag = "v0.1.0" }
 ```
 
-Then, you can use it in your code:
+### Fetch raw entropy
 
 ```rust
-use ctrng_rng::{
-    CtrngRng, MockCtrngClient, RandomBlockSource
-};
-        
+use crypto_ctrng::{IpfsCtrngClient, RandomBlockSource};
+
 let gateway = "https://ipfs.io";
 let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
-let mut ctrng = crypto_ctrng::IpfsCtrngClient::new(gateway, beacon_key);
-let seed = ctrng.next_block().expect("failed to fetch IPFS block")
+
+let mut ctrng = IpfsCtrngClient::new(gateway, beacon_key);
+let block = ctrng.next_block().expect("failed to fetch IPFS block");
+```
+
+### DRBG with automatic reseeding (recommended)
+
+```rust
+use crypto_ctrng::{IpfsCtrngClient, MixedCtrngClient, ReseedingRng};
+use rand_core::RngCore;
+
+let gateway = "https://ipfs.io";
+let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+
+let ipfs = IpfsCtrngClient::new(gateway, beacon_key);
+let mixed = MixedCtrngClient::new(ipfs).unwrap();
+let mut rng = ReseedingRng::new(mixed).unwrap();
+
+let mut key = [0u8; 32];
+rng.fill_bytes(&mut key);
+```
+
+### Custom reseed intervals
+
+```rust
+use std::time::Duration;
+use crypto_ctrng::{IpfsCtrngClient, MixedCtrngClient, ReseedConfig, ReseedingRng};
+
+let gateway = "https://ipfs.io";
+let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+
+let ipfs = IpfsCtrngClient::new(gateway, beacon_key);
+let mixed = MixedCtrngClient::new(ipfs).unwrap();
+
+let config = ReseedConfig::new(1600, Duration::from_secs(3600)); // 50 blocks, 1 hour
+let mut rng = ReseedingRng::with_config(mixed, config).unwrap();
 ```
 
 ## Tests
 
-To run offline tests : 
+To run offline tests :
 
-```cargo tests```
+```cargo test```
 
-To run offline and online tests : 
+To run offline and online tests :
 
-```cargo test -- --include ignored```
+```cargo test -- --include-ignored```
 
 
 ## License
