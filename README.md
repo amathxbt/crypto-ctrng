@@ -95,6 +95,43 @@ To run offline and online tests :
 
 ```cargo test -- --include-ignored```
 
+### TestU01 statistical runner
+
+Statistical testing is provided by the separate [`testu01-runner`](https://github.com/spacecomputer-io/statistical-verification) library.
+
+To use it, add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+testu01-runner = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }
+crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git" }
+```
+
+TestU01 is automatically downloaded and built during compilation - no manual setup required.
+
+To run TestU01 statistical tests:
+
+```bash
+cargo test --features testu01
+```
+
+Example usage:
+
+```rust
+use crypto_ctrng::rng_from_seed_block;
+use testu01_runner::{bbattery_BigCrush, register_rng, make_unif01_gen, delete_unif01_gen};
+
+let seed = [0u8; 32];
+let mut rng = rng_from_seed_block(seed);
+register_rng(rng);
+
+unsafe {
+    let gen = make_unif01_gen("crypto-ctrng");
+    bbattery_BigCrush(gen);
+    delete_unif01_gen(gen);
+}
+```
+
 
 ## License
 
