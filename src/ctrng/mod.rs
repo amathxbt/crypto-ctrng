@@ -1,2 +1,2 @@
 pub mod ipfs;
-pub mod mock;
+pub mod types;

@@ -16,7 +16,7 @@ This crate's responsibility is to **verify** that the cTRNG backend provides uni
 - **Application/client code** (e.g. TECDSA library) is responsible for personalizing the provided blocks using `derive_seed(execution_id, party_id, counter, block)` to domain-separate pulls so a single user never receives the same derived value twice, even if they consume the same cTRNG block as other users (but this is something that we are looking to prevent in the future).
 
 **Note on entropy mixing:**
-- `MixedCtrngClient` combines entropy sources (XOR of IPFS beacon + local OS randomness) for enhanced security, but still relies on the gateway for uniqueness guarantees.
+- `MixedCtrng` combines entropy sources (XOR of IPFS beacon + local OS randomness) for enhanced security, but still relies on the gateway for uniqueness guarantees.
 
 **Uniqueness guarantees:**
 - This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse (I thought so, but according to today's bug, we can have same ctrng for two different timestamp, so we need to find another way).
@@ -26,8 +26,8 @@ This crate's responsibility is to **verify** that the cTRNG backend provides uni
 
 | Mode | Code | DRBG | Reseed |
 |------|------|------|--------|
-| Raw entropy | `CtrngRng::new(source)` | ❌ | N/A |
-| DRBG one-shot | `rng_from_seed_block(block)` | ChaCha20 | ❌ |
+| Raw entropy | `BlockRng::new(source)` | ❌ | N/A |
+| Seeded DRBG (testing) | `ChaCha20Rng::from_seed(seed)` | ChaCha20 | ❌ |
 | DRBG + auto reseed | `ReseedingRng::new(source)` | ChaCha20 | 3200 bytes / 1 week |
 | DRBG + prediction resistance | `ReseedingRng::with_prediction_resistance(source)` | ChaCha20 | every call |
 
@@ -43,26 +43,26 @@ crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git", t
 ### Fetch raw entropy
 
 ```rust
-use crypto_ctrng::{IpfsCtrngClient, RandomBlockSource};
+use crypto_ctrng::{IpfsCtrng, RandomBlockSource};
 
 let gateway = "https://ipfs.io";
 let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
 
-let mut ctrng = IpfsCtrngClient::new(gateway, beacon_key);
+let mut ctrng = IpfsCtrng::new(gateway, beacon_key);
 let block = ctrng.next_block().expect("failed to fetch IPFS block");
 ```
 
 ### DRBG with automatic reseeding (recommended)
 
 ```rust
-use crypto_ctrng::{IpfsCtrngClient, MixedCtrngClient, ReseedingRng};
+use crypto_ctrng::{IpfsCtrng, MixedCtrng, ReseedingRng};
 use rand_core::RngCore;
 
 let gateway = "https://ipfs.io";
 let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
 
-let ipfs = IpfsCtrngClient::new(gateway, beacon_key);
-let mixed = MixedCtrngClient::new(ipfs).unwrap();
+let ipfs = IpfsCtrng::new(gateway, beacon_key);
+let mixed = MixedCtrng::new(ipfs).unwrap();
 let mut rng = ReseedingRng::new(mixed).unwrap();
 
 let mut key = [0u8; 32];
@@ -73,13 +73,13 @@ rng.fill_bytes(&mut key);
 
 ```rust
 use std::time::Duration;
-use crypto_ctrng::{IpfsCtrngClient, MixedCtrngClient, ReseedConfig, ReseedingRng};
+use crypto_ctrng::{IpfsCtrng, MixedCtrng, ReseedConfig, ReseedingRng};
 
 let gateway = "https://ipfs.io";
 let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
 
-let ipfs = IpfsCtrngClient::new(gateway, beacon_key);
-let mixed = MixedCtrngClient::new(ipfs).unwrap();
+let ipfs = IpfsCtrng::new(gateway, beacon_key);
+let mixed = MixedCtrng::new(ipfs).unwrap();
 
 let config = ReseedConfig::new(1600, Duration::from_secs(3600)); // 50 blocks, 1 hour
 let mut rng = ReseedingRng::with_config(mixed, config).unwrap();
@@ -118,11 +118,12 @@ cargo test --features testu01
 Example usage:
 
 ```rust
-use crypto_ctrng::rng_from_seed_block;
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 use testu01_runner::{bbattery_BigCrush, register_rng, make_unif01_gen, delete_unif01_gen};
 
 let seed = [0u8; 32];
-let mut rng = rng_from_seed_block(seed);
+let rng = ChaCha20Rng::from_seed(seed);
 register_rng(rng);
 
 unsafe {

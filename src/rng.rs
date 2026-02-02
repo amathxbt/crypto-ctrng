@@ -1,37 +1,39 @@
-use crate::error::CtrngError;
-use crate::traits::RandomBlockSource;
 use rand_core::{CryptoRng, Error, RngCore, impls};
 use zeroize::Zeroize;
 
+use crate::error::SourceError;
+use crate::traits::RandomBlockSource;
+
+/// RNG that buffers 32-byte blocks from a RandomBlockSource.
 #[derive(Debug)]
-pub struct CtrngRng<C> {
-    client: C,
+pub struct BlockRng<C> {
+    source: C,
     buffer: [u8; 32],
     cursor: usize,
 }
 
-impl<C: RandomBlockSource> CtrngRng<C> {
-    pub fn new(mut client: C) -> Result<Self, CtrngError> {
-        let buffer = client.next_block()?;
+impl<C: RandomBlockSource> BlockRng<C> {
+    pub fn new(mut source: C) -> Result<Self, SourceError> {
+        let buffer = source.next_block()?;
         Ok(Self {
-            client,
+            source,
             buffer,
             cursor: 0,
         })
     }
 
-    pub fn client_mut(&mut self) -> &mut C {
-        &mut self.client
+    pub fn source_mut(&mut self) -> &mut C {
+        &mut self.source
     }
 
-    fn refill(&mut self) -> Result<(), CtrngError> {
+    fn refill(&mut self) -> Result<(), SourceError> {
         self.buffer.zeroize();
-        self.buffer = self.client.next_block()?;
+        self.buffer = self.source.next_block()?;
         self.cursor = 0;
         Ok(())
     }
 
-    fn fill_bytes_internal(&mut self, dest: &mut [u8]) -> Result<(), CtrngError> {
+    fn fill_bytes_internal(&mut self, dest: &mut [u8]) -> Result<(), SourceError> {
         let mut filled = 0;
         while filled < dest.len() {
             if self.cursor == self.buffer.len() {
@@ -48,12 +50,13 @@ impl<C: RandomBlockSource> CtrngRng<C> {
         Ok(())
     }
 
-    pub fn try_fill_bytes_fallible(&mut self, dest: &mut [u8]) -> Result<(), CtrngError> {
+    /// Like `try_fill_bytes` but returns `SourceError` for precise error handling.
+    pub fn try_fill_bytes_source(&mut self, dest: &mut [u8]) -> Result<(), SourceError> {
         self.fill_bytes_internal(dest)
     }
 }
 
-impl<C: RandomBlockSource> RngCore for CtrngRng<C> {
+impl<C: RandomBlockSource> RngCore for BlockRng<C> {
     fn next_u32(&mut self) -> u32 {
         impls::next_u32_via_fill(self)
     }
@@ -70,9 +73,9 @@ impl<C: RandomBlockSource> RngCore for CtrngRng<C> {
     }
 }
 
-impl<C: RandomBlockSource> CryptoRng for CtrngRng<C> {}
+impl<C: RandomBlockSource> CryptoRng for BlockRng<C> {}
 
-impl<C> Drop for CtrngRng<C> {
+impl<C> Drop for BlockRng<C> {
     fn drop(&mut self) {
         self.buffer.zeroize();
         self.cursor.zeroize();

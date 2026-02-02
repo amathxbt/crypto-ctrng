@@ -6,7 +6,7 @@ const GATEWAY: &str = "https://ipfs.io";
 #[test]
 #[ignore]
 fn ipfs_client_can_fetch_live_block() {
-    let mut client = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
+    let mut client = crypto_ctrng::IpfsCtrng::new(GATEWAY, BEACON_KEY);
     let block = client.next_block().expect("fetch 32-byte block");
     assert_eq!(block.len(), 32);
 }
@@ -14,7 +14,7 @@ fn ipfs_client_can_fetch_live_block() {
 #[test]
 #[ignore]
 fn ipfs_unique_blocks() {
-    let mut client = crypto_ctrng::IpfsCtrngClient::new(GATEWAY, BEACON_KEY);
+    let mut client = crypto_ctrng::IpfsCtrng::new(GATEWAY, BEACON_KEY);
 
     let a = client.next_block().expect("first block");
     let b = client.next_block().expect("second block");

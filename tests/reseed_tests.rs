@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crypto_ctrng::{
-    CtrngError, LocalCtrngClient, MockCtrngClient, RandomBlockSource, ReseedConfig, ReseedingRng,
-    DEFAULT_RESEED_BYTES, DEFAULT_RESEED_TIME,
+    DEFAULT_RESEED_BYTES, DEFAULT_RESEED_TIME, LocalRng, RandomBlockSource, ReseedConfig,
+    ReseedingRng, SourceError,
 };
 use rand_core::RngCore;
 
@@ -28,10 +28,10 @@ impl TestSource {
 }
 
 impl RandomBlockSource for TestSource {
-    fn next_block(&mut self) -> Result<[u8; 32], CtrngError> {
+    fn next_block(&mut self) -> Result<[u8; 32], SourceError> {
         self.call_count += 1;
         if self.fail_on_call == Some(self.call_count) {
-            return Err(CtrngError::backend("simulated failure"));
+            return Err(SourceError::ctrng("simulated failure"));
         }
         let mut block = [0u8; 32];
         block[0..4].copy_from_slice(&self.call_count.to_le_bytes());
@@ -47,7 +47,7 @@ fn default_constants() {
 
 #[test]
 fn with_local_source() {
-    let local = LocalCtrngClient::new().unwrap();
+    let local = LocalRng::new();
     let mut rng = ReseedingRng::new(local).unwrap();
 
     let mut buf1 = [0u8; 32];
@@ -56,17 +56,6 @@ fn with_local_source() {
     rng.fill_bytes(&mut buf2);
 
     assert_ne!(buf1, buf2);
-}
-
-#[test]
-fn with_mock_source() {
-    let mock = MockCtrngClient::from_seed([42u8; 32]);
-    let mut rng = ReseedingRng::new(mock).unwrap();
-
-    let mut buf = [0u8; 64];
-    rng.fill_bytes(&mut buf);
-
-    assert!(buf.iter().any(|&b| b != 0));
 }
 
 #[test]
@@ -136,7 +125,7 @@ fn try_fill_bytes_propagates_errors() {
     let mut buf = [0u8; 32];
     rng.fill_bytes(&mut buf);
 
-    let result = rng.try_fill_bytes_fallible(&mut buf);
+    let result = rng.try_fill_bytes_source(&mut buf);
     assert!(result.is_err());
 }
 

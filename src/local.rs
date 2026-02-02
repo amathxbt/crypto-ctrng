@@ -1,22 +1,28 @@
-use crate::error::CtrngError;
+use crate::error::SourceError;
 use crate::traits::RandomBlockSource;
 use getrandom::getrandom;
 
+/// OS-backed RNG using getrandom
 #[derive(Debug)]
-pub struct LocalCtrngClient;
+pub struct LocalRng;
 
-impl LocalCtrngClient {
-    pub fn new() -> Result<Self, CtrngError> {
-        Ok(Self)
+impl LocalRng {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl RandomBlockSource for LocalCtrngClient {
-    fn next_block(&mut self) -> Result<[u8; 32], CtrngError> {
+impl Default for LocalRng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RandomBlockSource for LocalRng {
+    fn next_block(&mut self) -> Result<[u8; 32], SourceError> {
         let mut block = [0u8; 32];
         getrandom(&mut block)
-            .map_err(|e| CtrngError::backend(format!("failed to get OS randomness: {e}")))?;
+            .map_err(|e| SourceError::os(format!("failed to get OS randomness: {e}")))?;
         Ok(block)
     }
 }
-

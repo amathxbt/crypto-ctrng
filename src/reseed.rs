@@ -5,12 +5,15 @@ use rand_core::{CryptoRng, Error, RngCore, SeedableRng, impls};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
-use crate::error::CtrngError;
+use crate::error::SourceError;
 use crate::traits::RandomBlockSource;
 
 pub const DEFAULT_RESEED_BYTES: u64 = 3200;
 pub const DEFAULT_RESEED_TIME: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
+const DRBG_DOMAIN_SEPARATOR: &[u8] = b"crypto-ctrng-drbg-seed-v1";
+
+/// Configuration for automatic reseeding.
 #[derive(Debug, Clone)]
 pub struct ReseedConfig {
     pub reseed_interval_bytes: u64,
@@ -42,6 +45,10 @@ impl ReseedConfig {
     }
 }
 
+/// DRBG that automatically reseeds from a RandomBlockSource.
+///
+/// This struct uses an internal ChaCha20 DRBG and periodically reseeds from the source.
+/// It reduces calls to expensive sources (IPFS, OS) while maintaining security.
 #[derive(Debug)]
 pub struct ReseedingRng<S: RandomBlockSource> {
     source: S,
@@ -52,13 +59,13 @@ pub struct ReseedingRng<S: RandomBlockSource> {
 }
 
 impl<S: RandomBlockSource> ReseedingRng<S> {
-    pub fn new(source: S) -> Result<Self, CtrngError> {
+    pub fn new(source: S) -> Result<Self, SourceError> {
         Self::with_config(source, ReseedConfig::default())
     }
 
-    pub fn with_config(mut source: S, config: ReseedConfig) -> Result<Self, CtrngError> {
+    pub fn with_config(mut source: S, config: ReseedConfig) -> Result<Self, SourceError> {
         let block = source.next_block()?;
-        let seed = Sha256::digest([b"crypto-ctrng-drbg-seed-v1", block.as_slice()].concat());
+        let seed = Sha256::digest([DRBG_DOMAIN_SEPARATOR, block.as_slice()].concat());
         let drbg = ChaCha20Rng::from_seed(seed.into());
 
         Ok(Self {
@@ -70,7 +77,7 @@ impl<S: RandomBlockSource> ReseedingRng<S> {
         })
     }
 
-    pub fn with_prediction_resistance(source: S) -> Result<Self, CtrngError> {
+    pub fn with_prediction_resistance(source: S) -> Result<Self, SourceError> {
         Self::with_config(source, ReseedConfig::prediction_resistant())
     }
 
@@ -79,9 +86,9 @@ impl<S: RandomBlockSource> ReseedingRng<S> {
             || self.last_reseed.elapsed() >= self.config.reseed_interval_time
     }
 
-    pub fn reseed(&mut self) -> Result<(), CtrngError> {
+    pub fn reseed(&mut self) -> Result<(), SourceError> {
         let block = self.source.next_block()?;
-        let seed = Sha256::digest([b"crypto-ctrng-drbg-seed-v1", block.as_slice()].concat());
+        let seed = Sha256::digest([DRBG_DOMAIN_SEPARATOR, block.as_slice()].concat());
         self.drbg = ChaCha20Rng::from_seed(seed.into());
         self.bytes_since_reseed = 0;
         self.last_reseed = Instant::now();
@@ -104,21 +111,22 @@ impl<S: RandomBlockSource> ReseedingRng<S> {
         &mut self.source
     }
 
-    fn reseed_if_needed(&mut self) -> Result<(), CtrngError> {
+    fn reseed_if_needed(&mut self) -> Result<(), SourceError> {
         if self.needs_reseed() {
             self.reseed()?;
         }
         Ok(())
     }
 
-    fn fill_bytes_internal(&mut self, dest: &mut [u8]) -> Result<(), CtrngError> {
+    fn fill_bytes_internal(&mut self, dest: &mut [u8]) -> Result<(), SourceError> {
         self.reseed_if_needed()?;
         self.drbg.fill_bytes(dest);
         self.bytes_since_reseed += dest.len() as u64;
         Ok(())
     }
 
-    pub fn try_fill_bytes_fallible(&mut self, dest: &mut [u8]) -> Result<(), CtrngError> {
+    /// Like `try_fill_bytes` but returns `SourceError` for precise error handling.
+    pub fn try_fill_bytes_source(&mut self, dest: &mut [u8]) -> Result<(), SourceError> {
         self.fill_bytes_internal(dest)
     }
 }
@@ -160,7 +168,10 @@ mod tests {
     fn default_config() {
         let config = ReseedConfig::default();
         assert_eq!(config.reseed_interval_bytes, 3200);
-        assert_eq!(config.reseed_interval_time, Duration::from_secs(7 * 24 * 60 * 60));
+        assert_eq!(
+            config.reseed_interval_time,
+            Duration::from_secs(7 * 24 * 60 * 60)
+        );
     }
 
     #[test]

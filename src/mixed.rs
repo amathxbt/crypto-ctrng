@@ -1,30 +1,29 @@
-use crate::error::CtrngError;
-use crate::local::LocalCtrngClient;
+use crate::error::SourceError;
+use crate::local::LocalRng;
 use crate::traits::RandomBlockSource;
 
-/// A client that mixes randomness from a remote source with local OS randomness.
+/// Mixes remote and local entropy (XOR).
 /// This provides defense in depth: even if the remote source is compromised,
 /// the local entropy ensures unpredictability.
 #[derive(Debug)]
-pub struct MixedCtrngClient<R: RandomBlockSource> {
-    remote_client: R,
-    local_client: LocalCtrngClient,
+pub struct MixedCtrng<R: RandomBlockSource> {
+    remote: R,
+    local: LocalRng,
 }
 
-impl<R: RandomBlockSource> MixedCtrngClient<R> {
-    pub fn new(remote_client: R) -> Result<Self, CtrngError> {
-        let local_client = LocalCtrngClient::new()?;
+impl<R: RandomBlockSource> MixedCtrng<R> {
+    pub fn new(remote: R) -> Result<Self, SourceError> {
         Ok(Self {
-            remote_client,
-            local_client,
+            remote,
+            local: LocalRng::new(),
         })
     }
 }
 
-impl<R: RandomBlockSource> RandomBlockSource for MixedCtrngClient<R> {
-    fn next_block(&mut self) -> Result<[u8; 32], CtrngError> {
-        let remote_block = self.remote_client.next_block()?;
-        let local_block = self.local_client.next_block()?;
+impl<R: RandomBlockSource> RandomBlockSource for MixedCtrng<R> {
+    fn next_block(&mut self) -> Result<[u8; 32], SourceError> {
+        let remote_block = self.remote.next_block()?;
+        let local_block = self.local.next_block()?;
 
         let mut mixed_block = [0u8; 32];
         for i in 0..32 {
@@ -33,4 +32,3 @@ impl<R: RandomBlockSource> RandomBlockSource for MixedCtrngClient<R> {
         Ok(mixed_block)
     }
 }
-
