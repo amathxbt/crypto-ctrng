@@ -1,6 +1,5 @@
-use crypto_ctrng::{BlockRng, RandomBlockSource, SourceError, derive_seed};
+use crypto_ctrng::{BlockRng, RandomBlockSource, SourceError};
 use rand_core::RngCore;
-use std::collections::HashSet;
 
 #[test]
 fn flaky_source_propagates_error() {
@@ -52,15 +51,4 @@ fn flaky_source_propagates_error() {
     .expect("first block should succeed");
     let mut buf3 = [0u8; 64];
     assert!(rng_trait.try_fill_bytes(&mut buf3).is_err());
-}
-
-#[test]
-fn derive_seed_yields_unique_material() {
-    let exec = b"derive-seed-exec-id";
-    let ctrng = [0xAA; 32];
-    let mut seen = HashSet::new();
-    for ctr in 0..256u64 {
-        let seed = derive_seed(exec, 1, ctr, &ctrng);
-        assert!(seen.insert(seed), "duplicate seed for counter {ctr}");
-    }
 }

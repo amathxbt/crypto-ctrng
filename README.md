@@ -13,21 +13,21 @@ This crate's responsibility is to **verify** that the cTRNG backend provides uni
 
 - **Gateway/back-end** (e.g. IPFS beacon, hardware TRNG) is responsible for generating unique 32-byte blocks with monotonic timestamps. This responsibility sits outside of this crate.
 - **This crate** (`crypto-ctrng`) verifies uniqueness by enforcing timestamp monotonicity and rejecting duplicate blocks.
-- **Application/client code** (e.g. TECDSA library) is responsible for personalizing the provided blocks using `derive_seed(execution_id, party_id, counter, block)` to domain-separate pulls so a single user never receives the same derived value twice, even if they consume the same cTRNG block as other users (but this is something that we are looking to prevent in the future).
+- **Application/client code** (e.g. TECDSA library) is responsible for personalizing the provided blocks to domain-separate pulls so a single user never receives the same derived value twice, even if they consume the same cTRNG block as other users (but this is something that we are looking to prevent in the future).
 
 **Note on entropy mixing:**
 - `MixedCtrng` combines entropy sources (XOR of IPFS beacon + local OS randomness) for enhanced security, but still relies on the gateway for uniqueness guarantees.
 
 **Uniqueness guarantees:**
-- This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse (I thought so, but according to today's bug, we can have same ctrng for two different timestamp, so we need to find another way).
-- The calling library must use `derive_seed()` to personalize blocks per user/execution to prevent collisions between different users reading the same raw block.
+- This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse.
+- The calling library must personalize blocks per user/execution to prevent collisions between different users reading the same raw block.
 
 ## Usage modes
 
 | Mode | Code | DRBG | Reseed |
 |------|------|------|--------|
-| Raw entropy | `BlockRng::new(source)` | ❌ | N/A |
-| Seeded DRBG (testing) | `ChaCha20Rng::from_seed(seed)` | ChaCha20 | ❌ |
+| Raw entropy | `BlockRng::new(source)` | N/A | N/A |
+| Seeded DRBG (testing) | `ChaCha20Rng::from_seed(seed)` | ChaCha20 | N/A |
 | DRBG + auto reseed | `ReseedingRng::new(source)` | ChaCha20 | 3200 bytes / 1 week |
 | DRBG + prediction resistance | `ReseedingRng::with_prediction_resistance(source)` | ChaCha20 | every call |
 
@@ -40,28 +40,57 @@ To use this crate, add it to your `Cargo.toml`:
 crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git", tag = "v0.1.0" }
 ```
 
-### Fetch raw entropy
+### Fetch raw entropy (default gateways)
 
 ```rust
-use crypto_ctrng::{IpfsCtrng, RandomBlockSource};
+use crypto_ctrng::{Ctrng, RandomBlockSource};
 
-let gateway = "https://ipfs.io";
-let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
 
-let mut ctrng = IpfsCtrng::new(gateway, beacon_key);
+let mut ctrng = Ctrng::ipfs(beacon_key, None);
 let block = ctrng.next_block().expect("failed to fetch IPFS block");
+```
+
+### Custom gateways with automatic fallback
+
+If a gateway is unresponsive or down, the next one in the list is tried automatically.
+The default timeout is 10 seconds per gateway.
+
+```rust
+use crypto_ctrng::{Ctrng, IpfsConfig, RandomBlockSource};
+use std::time::Duration;
+
+let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
+
+// Custom gateways + default gateways appended automatically
+let config = IpfsConfig {
+    gateways: vec!["https://my-gateway.example.com".into()],
+    ..Default::default()
+};
+let mut ctrng = Ctrng::ipfs(beacon_key, Some(config));
+let block = ctrng.next_block().expect("at least one gateway should respond");
+
+// Custom gateways only (no defaults), with a custom timeout
+let config = IpfsConfig {
+    gateways: vec![
+        "https://ipfs.filebase.io".into(),
+        "https://ipfs.io".into(),
+    ],
+    use_defaults: false,
+    timeout: Duration::from_secs(5),
+};
+let mut ctrng = Ctrng::ipfs(beacon_key, Some(config));
 ```
 
 ### DRBG with automatic reseeding (recommended)
 
 ```rust
-use crypto_ctrng::{IpfsCtrng, MixedCtrng, ReseedingRng};
+use crypto_ctrng::{Ctrng, MixedCtrng, ReseedingRng};
 use rand_core::RngCore;
 
-let gateway = "https://ipfs.io";
-let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
 
-let ipfs = IpfsCtrng::new(gateway, beacon_key);
+let ipfs = Ctrng::ipfs(beacon_key, None);
 let mixed = MixedCtrng::new(ipfs).unwrap();
 let mut rng = ReseedingRng::new(mixed).unwrap();
 
@@ -73,12 +102,11 @@ rng.fill_bytes(&mut key);
 
 ```rust
 use std::time::Duration;
-use crypto_ctrng::{IpfsCtrng, MixedCtrng, ReseedConfig, ReseedingRng};
+use crypto_ctrng::{Ctrng, MixedCtrng, ReseedConfig, ReseedingRng};
 
-let gateway = "https://ipfs.io";
-let beacon_key = "k2k4r8pigrw8i34z63om8f015tt5igdq0c46xupq8spp1bogt35k5vhe";
+let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
 
-let ipfs = IpfsCtrng::new(gateway, beacon_key);
+let ipfs = Ctrng::ipfs(beacon_key, None);
 let mixed = MixedCtrng::new(ipfs).unwrap();
 
 let config = ReseedConfig::new(1600, Duration::from_secs(3600)); // 50 blocks, 1 hour
@@ -89,11 +117,22 @@ let mut rng = ReseedingRng::with_config(mixed, config).unwrap();
 
 To run offline tests :
 
-```cargo test```
+```bash
+cargo test -- --skip test_e2e
+```
 
-To run offline and online tests :
+To run the IPFS-backed end-to-end tests :
 
-```cargo test -- --include-ignored```
+```bash
+cargo test test_e2e
+```
+
+You can also run the dedicated e2e integration targets individually:
+
+```bash
+cargo test --test e2e_ipfs
+cargo test --test e2e_mixed
+```
 
 ### TestU01 statistical runner
 

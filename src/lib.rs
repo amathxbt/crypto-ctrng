@@ -1,5 +1,5 @@
 pub mod ctrng;
-pub mod derive;
+
 pub mod error;
 pub mod local;
 pub mod mixed;
@@ -7,8 +7,9 @@ pub mod reseed;
 pub mod rng;
 pub mod traits;
 
-pub use ctrng::ipfs::IpfsCtrng;
-pub use derive::derive_seed;
+pub use ctrng::Ctrng;
+pub use ctrng::ipfs_beacon::{DEFAULT_GATEWAYS, DEFAULT_TIMEOUT, IpfsConfig, IpfsGateway};
+
 pub use error::SourceError;
 pub use local::LocalRng;
 pub use mixed::MixedCtrng;

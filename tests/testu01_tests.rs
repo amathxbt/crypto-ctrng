@@ -1,5 +1,5 @@
 #[cfg(feature = "testu01")]
-use crypto_ctrng::{IpfsCtrng, RandomBlockSource};
+use crypto_ctrng::{Ctrng, RandomBlockSource};
 #[cfg(feature = "testu01")]
 use rand_chacha::ChaCha20Rng;
 #[cfg(feature = "testu01")]
@@ -11,9 +11,9 @@ use testu01_runner::{delete_unif01_gen, make_unif01_gen, register_rng};
 
 #[cfg(feature = "testu01")]
 fn build_ipfs_seeded_rng() -> ChaCha20Rng {
-    let gateway = "https://ipfs.io";
+    let gateway = "https://ipfs.filebase.io";
     let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
-    let mut ctrng = IpfsCtrng::new(gateway, beacon_key);
+    let mut ctrng = Ctrng::ipfs(beacon_key, None);
     let seed = ctrng.next_block().expect("failed to fetch IPFS block");
     ChaCha20Rng::from_seed(seed)
 }
