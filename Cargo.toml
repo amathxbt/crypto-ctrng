@@ -18,6 +18,7 @@ hex = "0.4"
 [features]
 default = []
 testu01 = []
+practrand = []
 
 [dev-dependencies]
-testu01-runner = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }
+rng-statistical-tests = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }

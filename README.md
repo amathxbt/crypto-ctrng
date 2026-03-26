@@ -134,42 +134,30 @@ cargo test --test e2e_ipfs
 cargo test --test e2e_mixed
 ```
 
-### TestU01 statistical runner
-
-Statistical testing is provided by the separate [`testu01-runner`](https://github.com/spacecomputer-io/statistical-verification) library.
-
-To use it, add to your `Cargo.toml`:
-
-```toml
-[dependencies]
-testu01-runner = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }
-crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git" }
-```
-
-TestU01 is automatically downloaded and built during compilation - no manual setup required.
-
-To run TestU01 statistical tests:
+To run the IPFS-backed end-to-end tests :
 
 ```bash
-cargo test --features testu01
+cargo test test_e2e
 ```
 
-Example usage:
+You can also run the dedicated e2e integration targets individually:
 
-```rust
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
-use testu01_runner::{bbattery_BigCrush, register_rng, make_unif01_gen, delete_unif01_gen};
+```bash
+cargo test --test e2e_ipfs
+cargo test --test e2e_mixed
+```
 
-let seed = [0u8; 32];
-let rng = ChaCha20Rng::from_seed(seed);
-register_rng(rng);
+### Statistical verification
 
-unsafe {
-    let gen = make_unif01_gen("crypto-ctrng");
-    bbattery_BigCrush(gen);
-    delete_unif01_gen(gen);
-}
+Statistical testing is provided by the separate [`rng-statistical-tests`](https://github.com/spacecomputer-io/statistical-verification) library, which supports both **TestU01** and **PractRand**.
+
+TestU01 and PractRand are automatically downloaded and built during compilation - no manual setup required.
+
+To run statistical tests:
+
+```bash
+cargo test --features testu01     # TestU01 SmallCrush
+cargo test --features practrand   # PractRand (1 MiB)
 ```
 
 
