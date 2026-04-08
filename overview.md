@@ -1,10 +1,4 @@
-# SpaceComputer | crypto-ctrng
-
-![spacecomputer logo](https://raw.githubusercontent.com/spacecomputer-io/media-kit/refs/heads/main/SpaceComputer/logo/SpaceComputer_banner.png)
-
-![Tests](https://github.com/spacecomputer-io/crypto-ctrng/actions/workflows/rust.yml/badge.svg?branch=main)
-
-This repository contains the crypto-ctrng project by SpaceComputer.
+**WARNING: This project is experimental and work-in-progress, use at your own risk!**
 
 ## Overview
 
@@ -12,10 +6,6 @@ This crate provides a lightweight and secure abstraction layer over a cosmic Tru
 It allows deterministic or hardware-backed randomness to be consumed through the standard `RngCore` and `CryptoRng` traits from `rand_core`.
 
 The main goals is to expose a clean, composable API for hardware or remote entropy backends.
-
-## Links
-
-* [SpaceComputer docs](https://docs.spacecomputer.io)
 
 ### Entropy ownership contract
 
@@ -127,42 +117,11 @@ let mut rng = ReseedingRng::with_config(mixed, config).unwrap();
 
 To run offline tests :
 
-```bash
-cargo test -- --skip test_e2e
-```
+```cargo test```
 
-To run the IPFS-backed end-to-end tests :
+To run offline and online tests :
 
-```bash
-cargo test test_e2e
-```
-
-You can also run the dedicated e2e integration targets individually:
-
-```bash
-cargo test --test e2e_ipfs
-cargo test --test e2e_mixed
-```
-
-You can also run the dedicated e2e integration targets individually:
-
-```bash
-cargo test --test e2e_ipfs
-cargo test --test e2e_mixed
-```
-
-To run the IPFS-backed end-to-end tests :
-
-```bash
-cargo test test_e2e
-```
-
-You can also run the dedicated e2e integration targets individually:
-
-```bash
-cargo test --test e2e_ipfs
-cargo test --test e2e_mixed
-```
+```cargo test -- --include-ignored```
 
 ### Statistical verification
 

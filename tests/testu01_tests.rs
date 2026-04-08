@@ -11,7 +11,6 @@ use rng_statistical_tests::testu01::{
 
 #[cfg(feature = "testu01")]
 fn build_ipfs_seeded_rng() -> ChaCha20Rng {
-    let gateway = "https://ipfs.filebase.io";
     let beacon_key = "k2k4r8lvomw737sajfnpav0dpeernugnryng50uheyk1k39lursmn09f";
     let mut ctrng = Ctrng::ipfs(beacon_key, None);
     let seed = ctrng.next_block().expect("failed to fetch IPFS block");
