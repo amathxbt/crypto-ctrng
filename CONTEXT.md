@@ -39,9 +39,9 @@ RngCore / CryptoRng   ← standard rand_core traits
 |------|------|------|
 | `RandomBlockSource` | `src/traits.rs` | Trait every entropy backend must implement |
 | `Ctrng` | `src/ctrng/mod.rs` | Public enum dispatching to concrete backends |
-| `IpfsCtrng` | `src/ctrng/ipfs.rs` | IPFS beacon client (internal, behind `Ctrng`) |
-| `IpfsConfig` | `src/ctrng/ipfs.rs` | Gateway list, `use_defaults`, timeout |
-| `IpfsGateway` | `src/ctrng/ipfs.rs` | Newtype for gateway URL; builds `/ipfs/` and `/ipns/` paths |
+| `IpfsBeacon` | `src/ctrng/ipfs_beacon.rs` | IPFS beacon client (internal, behind `Ctrng`) |
+| `IpfsConfig` | `src/ctrng/ipfs_beacon.rs` | Gateway list, `use_defaults`, timeout |
+| `IpfsGateway` | `src/ctrng/ipfs_beacon.rs` | Newtype for gateway URL; builds `/ipfs/` and `/ipns/` paths |
 | `CtrngBlock` | `src/ctrng/types.rs` | Block with sequence number, timestamp, 32-byte data |
 | `MixedCtrng<R>` | `src/mixed.rs` | XOR of remote + local OS entropy |
 | `ReseedingRng` | `src/reseed.rs` | ChaCha20 DRBG with configurable reseed intervals |
@@ -58,7 +58,7 @@ src/
 ├── error.rs           SourceError
 ├── ctrng/
 │   ├── mod.rs         Ctrng enum + RandomBlockSource impl
-│   ├── ipfs.rs        IpfsCtrng, IpfsGateway, IpfsConfig, DEFAULT_GATEWAYS
+│   ├── ipfs_beacon.rs IpfsCtrng, IpfsGateway, IpfsConfig, DEFAULT_GATEWAYS
 │   └── types.rs       BeaconResponse, CtrngBlock
 ├── mixed.rs           MixedCtrng (XOR mixer)
 ├── reseed.rs          ReseedingRng, ReseedConfig
@@ -66,11 +66,12 @@ src/
 └── local.rs           LocalRng (OS entropy)
 
 tests/
-├── ipfs_live.rs           live IPFS gateway tests (#[ignore])
+├── e2e_ipfs.rs            live IPFS gateway tests
+├── e2e_mixed.rs           live MixedCtrng end-to-end tests
 ├── mixed_tests.rs         MixedCtrng tests (some #[ignore])
 ├── reseed_tests.rs        ReseedingRng offline tests
 ├── rng_tests.rs           BlockRng error propagation
-└── statistical_tests.rs   TestU01 / PractRand (behind features)
+└── testu01_tests.rs       TestU01 / PractRand (behind features)
 ```
 
 ## Conventions

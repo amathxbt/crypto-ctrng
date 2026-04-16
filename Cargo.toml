@@ -2,6 +2,13 @@
 name = "crypto-ctrng"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Secure abstraction layer over a cosmic True Random Number Generator (cTRNG) backend, exposing RngCore/CryptoRng traits"
+license = "MIT"
+repository = "https://github.com/spacecomputer-io/crypto-ctrng"
+homepage = "https://docs.spacecomputer.io"
+keywords = ["cryptography", "random", "trng", "entropy", "rng"]
+categories = ["cryptography"]
 
 [dependencies]
 rand_core = { version = "0.6", features = ["std"] }
@@ -21,4 +28,4 @@ testu01 = []
 practrand = []
 
 [dev-dependencies]
-rng-statistical-tests = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }
+statistical-verification = { git = "https://github.com/spacecomputer-io/statistical-verification.git" }

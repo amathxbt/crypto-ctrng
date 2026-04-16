@@ -144,29 +144,9 @@ cargo test --test e2e_ipfs
 cargo test --test e2e_mixed
 ```
 
-You can also run the dedicated e2e integration targets individually:
-
-```bash
-cargo test --test e2e_ipfs
-cargo test --test e2e_mixed
-```
-
-To run the IPFS-backed end-to-end tests :
-
-```bash
-cargo test test_e2e
-```
-
-You can also run the dedicated e2e integration targets individually:
-
-```bash
-cargo test --test e2e_ipfs
-cargo test --test e2e_mixed
-```
-
 ### Statistical verification
 
-Statistical testing is provided by the separate [`rng-statistical-tests`](https://github.com/spacecomputer-io/statistical-verification) library, which supports both **TestU01** and **PractRand**.
+Statistical testing is provided by the separate [`statistical-verification`](https://github.com/spacecomputer-io/statistical-verification) library, which supports both **TestU01** and **PractRand**.
 
 TestU01 and PractRand are automatically downloaded and built during compilation - no manual setup required.
 
@@ -176,12 +156,3 @@ To run statistical tests:
 cargo test --features testu01     # TestU01 SmallCrush
 cargo test --features practrand   # PractRand (1 MiB)
 ```
-
-
-## License
-
-This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-We welcome contributions to this project! If you have suggestions for improvements or new features, please open an issue or submit a pull request.
