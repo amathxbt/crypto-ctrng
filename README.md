@@ -8,10 +8,10 @@ This repository contains the crypto-ctrng project by SpaceComputer.
 
 ## Overview
 
-This crate provides a lightweight and secure abstraction layer over a cosmic True Random Number Generator (cTRNG) backend.
-It allows deterministic or hardware-backed randomness to be consumed through the standard `RngCore` and `CryptoRng` traits from `rand_core`.
+This crate provides a lightweight and secure abstraction layer over a cosmic True Random Number Generator (cTRNG) backend. It allows deterministic or hardware-backed randomness to be consumed through the standard `RngCore` and `CryptoRng` traits from `rand_core`.
 
 The main goals is to expose a clean, composable API for hardware or remote entropy backends.
+[Orbitport](https://github.com/spacecomputer-io/orbitport) is the entity that maintains the ipfs randomness beacon. 
 
 ## Links
 
@@ -21,12 +21,12 @@ The main goals is to expose a clean, composable API for hardware or remote entro
 
 This crate's responsibility is to **verify** that the cTRNG backend provides unique blocks. The randomness flow is split between three layers:
 
-- **Gateway/back-end** (e.g. IPFS beacon, hardware TRNG) is responsible for generating unique 32-byte blocks with monotonic timestamps. This responsibility sits outside of this crate.
+- **Gateway/back-end** (e.g. randomness beacon, hardware TRNG) is responsible for generating unique 32-byte blocks with monotonic timestamps. This responsibility sits outside of this crate.
 - **This crate** (`crypto-ctrng`) verifies uniqueness by enforcing timestamp monotonicity and rejecting duplicate blocks.
 - **Application/client code** (e.g. TECDSA library) is responsible for personalizing the provided blocks to domain-separate pulls so a single user never receives the same derived value twice, even if they consume the same cTRNG block as other users (but this is something that we are looking to prevent in the future).
 
 **Note on entropy mixing:**
-- `MixedCtrng` combines entropy sources (XOR of IPFS beacon + local OS randomness) for enhanced security, but still relies on the gateway for uniqueness guarantees.
+- `MixedCtrng` combines entropy sources (XOR of randomness beacon + local OS randomness) for enhanced security.
 
 **Uniqueness guarantees:**
 - This crate ensures that each `next_block()` call returns a block with a timestamp strictly greater than the previous one, preventing global block reuse.
@@ -50,7 +50,7 @@ To use this crate, add it to your `Cargo.toml`:
 crypto-ctrng = { git = "https://github.com/spacecomputer-io/crypto-ctrng.git", tag = "v0.1.0" }
 ```
 
-### Fetch raw entropy (default gateways)
+### Fetch raw entropy (default ipfs gateways)
 
 ```rust
 use crypto_ctrng::{Ctrng, RandomBlockSource};
@@ -61,10 +61,12 @@ let mut ctrng = Ctrng::ipfs(beacon_key, None);
 let block = ctrng.next_block().expect("failed to fetch IPFS block");
 ```
 
-### Custom gateways with automatic fallback
+For now, entropy gathered from ipfs gateways is public, two people gathering randomness from ipfs with the same beacon key and at the same time will get the same output. In the future, we plan to introduce private beacons. 
 
-If a gateway is unresponsive or down, the next one in the list is tried automatically.
-The default timeout is 10 seconds per gateway.
+### Custom ipfs gateways with automatic fallback
+
+If an ipfs gateway is unresponsive or down, the next one in the list is tried automatically.
+The default timeout is 10 seconds per ipfs gateway.
 
 ```rust
 use crypto_ctrng::{Ctrng, IpfsConfig, RandomBlockSource};
