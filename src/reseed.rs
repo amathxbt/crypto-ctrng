@@ -155,7 +155,26 @@ impl<S: RandomBlockSource> CryptoRng for ReseedingRng<S> {}
 
 impl<S: RandomBlockSource> Drop for ReseedingRng<S> {
     fn drop(&mut self) {
-        self.drbg = ChaCha20Rng::from_seed([0u8; 32]);
+        // Overwrite the ChaCha20 DRBG state with volatile zero-writes before
+        // releasing memory to the allocator.  A plain assignment
+        // (`self.drbg = ChaCha20Rng::from_seed([0; 32])`) drops the old object
+        // without first clearing its fields; the compiler is free to elide
+        // "dead" stores, leaving keystream material in heap memory.
+        // `ptr::write_bytes` with a subsequent compiler fence is not
+        // elided because it is treated as an observable side-effect by LLVM.
+        unsafe {
+            let ptr = &mut self.drbg as *mut ChaCha20Rng as *mut u8;
+            let len = std::mem::size_of::<ChaCha20Rng>();
+            // Write zero bytes over the DRBG struct in place.
+            std::ptr::write_bytes(ptr, 0, len);
+            // Compiler fence prevents the store from being reordered or
+            // removed by optimisation passes.
+            std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+            // Re-initialise with a zero seed so the slot holds a valid object
+            // for any subsequent Drop glue (e.g. if ChaCha20Rng has a non-trivial
+            // drop impl in a future version of rand_chacha).
+            std::ptr::write(&mut self.drbg, ChaCha20Rng::from_seed([0u8; 32]));
+        }
         self.bytes_since_reseed.zeroize();
     }
 }
